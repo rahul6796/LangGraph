@@ -3,6 +3,7 @@ from langchain import hub
 from langchain.agents import create_react_agent
 from langchain_community.chat_models import ChatOllama
 from langchain_community.tools.tavily_search import TavilySearchResults
+fr
 
 
 from typing import TypedDict, Annotated, Union, List

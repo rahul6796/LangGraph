@@ -1,2 +1,4 @@
 langgraph
 langchain
+sentence_transformers
+chromadb==0.5.3

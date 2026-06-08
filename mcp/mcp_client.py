@@ -7,8 +7,7 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.tools import tool
-
-
+import asyncio
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -37,47 +36,50 @@ def calculator(first_num: float, second_num: float, operation: str) -> dict:
         return {"first_num": first_num, "second_num": second_num, "operation": operation, "result": result}
     except Exception as e:
         return {"error": str(e)}
-    
 
 tools = [calculator]
 
 llm_with_tools = llm.bind_tools(tools)
-
-
 
 # state
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
 
-# nodes
-def chat_node(state: ChatState):
+def build_graph():
 
-    messages = state["messages"]
-    response = llm_with_tools.invoke(messages)
-    return {'messages': [response]}
+    # nodes
+    async def chat_node(state: ChatState):
 
-tool_node = ToolNode(tools)
+        messages = state["messages"]
+        response = await llm_with_tools.ainvoke(messages)
+        return {'messages': [response]}
 
+    tool_node = ToolNode(tools)
 
-# defining graph and nodes
-graph = StateGraph(ChatState)
+    # defining graph and nodes
+    graph = StateGraph(ChatState)
 
-# add node.
-graph.add_node("chat_node", chat_node)
-graph.add_node("tools", tool_node)
+    graph.add_node("chat_node", chat_node)
+    graph.add_node("tools", tool_node)
 
-# add edge.
+    # defining graph connections
+    graph.add_edge(START, "chat_node")
+    graph.add_conditional_edges("chat_node", tools_condition)
+    graph.add_edge("tools", "chat_node")
 
-# defining graph connections
-graph.add_edge(START, "chat_node")
-graph.add_conditional_edges("chat_node", tools_condition)
-graph.add_edge("tools", "chat_node")
+    chatbot = graph.compile()
 
+    return chatbot
 
-chatbot = graph.compile()
+async def main():
 
-# running the graph
-result = chatbot.invoke({"messages": [HumanMessage(content="Find the modulus of 132354 and 23 and give answer like a cricket commentator.")]})
+    chatbot = build_graph()
 
-print(result['messages'][-1].content)
+    # running the graph
+    result = await chatbot.ainvoke({"messages": [HumanMessage(content="Find the modulus of 132354 and 23 and give answer like a cricket commentator.")]})
+
+    print(result['messages'][-1].content)
+
+if __name__ == '__main__':
+    asyncio.run(main())
